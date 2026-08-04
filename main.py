@@ -1,9 +1,13 @@
 # /usr/bin/env python3
 
+import json
+import datetime
+import sqlite3
 import os
 
 import requests
 from dotenv import load_dotenv
+
 
 load_dotenv()
 
@@ -15,11 +19,38 @@ PROXIES = {
 IDS = os.getenv("IDS", "").split(",")
 
 
+class EpisodeUpdateInfo:
+    __tablename__ = "episode_update_info"
+
+    def __init__(self, subject_id, now_episode, update_time):
+        self.subject_id = subject_id
+        self.now_episode = now_episode
+        self.update_time = update_time
+
+
+def init_db():
+    conn = sqlite3.connect("episode_update_info.db")
+    cursor = conn.cursor()
+    cursor.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS {EpisodeUpdateInfo.__tablename__} (
+            subject_id INTEGER PRIMARY KEY,
+            now_episode INTEGER,
+            update_time TEXT
+        )
+        """
+    )
+    conn.commit()
+    conn.close()
+
+
 def main():
 
     for id in IDS:
         episodes = get_episodes(id)
-        print(id, episodes)
+        json_episodes = json.dumps(episodes, ensure_ascii=False, indent=4)
+        print(f"Subject ID: {id}")
+        print(json_episodes)
 
 
 def get_episodes(subject_id, type=None, limit=None, offset=None):
@@ -46,4 +77,5 @@ def get_episodes(subject_id, type=None, limit=None, offset=None):
 
 
 if __name__ == "__main__":
+    init_db()
     main()
