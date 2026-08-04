@@ -12,7 +12,6 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine, delete, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
-
 load_dotenv()
 
 logging.basicConfig(

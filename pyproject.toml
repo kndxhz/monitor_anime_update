@@ -9,3 +9,8 @@ dependencies = [
     "requests>=2.34.2",
     "sqlalchemy>=2.0.51",
 ]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.1",
+]
