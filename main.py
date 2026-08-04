@@ -5,7 +5,7 @@ import os
 
 import requests
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, delete, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 
@@ -38,6 +38,15 @@ def init_db():
 
 def main():
     with Session(engine) as session:
+        ids_set = {int(id) for id in IDS if id}
+        db_ids = set(session.execute(select(EpisodeUpdateInfo.subject_id)).scalars().all())
+        orphan_ids = db_ids - ids_set
+        if orphan_ids:
+            session.execute(
+                delete(EpisodeUpdateInfo).where(EpisodeUpdateInfo.subject_id.in_(orphan_ids))
+            )
+            session.commit()
+
         for id in IDS:
             episodes = get_episodes(id)
             print(f"Subject ID: {id}")
