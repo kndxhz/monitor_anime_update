@@ -112,8 +112,10 @@ def main():
                 )
                 session.commit()
 
+            # now_date = "2026-08-06"
             for episode in episodes["data"]:
                 if episode["airdate"] == now_date:
+                    # if True:
                     notify_user(id, episode, now_date)
                     break
 
