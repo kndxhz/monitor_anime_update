@@ -18,8 +18,8 @@ IDS = os.getenv("IDS", "").split(",")
 def main():
 
     for id in IDS:
-        episodes = get_episodes(id, type="TV", limit=100, offset=0)
-        print(episodes)
+        episodes = get_episodes(id)
+        print(id, episodes)
 
 
 def get_episodes(subject_id, type=None, limit=None, offset=None):
