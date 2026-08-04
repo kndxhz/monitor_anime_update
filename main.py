@@ -12,15 +12,12 @@ PROXIES = {
     "http": os.getenv("PROXIES", "http://127.0.0.1:7890"),
     "https": os.getenv("PROXIES", "http://127.0.0.1:7890"),
 }
+IDS = os.getenv("IDS", "").split(",")
 
 
 def main():
-    ids = []
-    with open("ids.txt", "r") as f:
-        for line in f:
-            ids.append(line.strip())
 
-    for id in ids:
+    for id in IDS:
         episodes = get_episodes(id, type="TV", limit=100, offset=0)
         print(episodes)
 
@@ -35,7 +32,11 @@ def get_episodes(subject_id, type=None, limit=None, offset=None):
         url += f"&offset={offset}"
 
     payload = {}
-    headers = {"Authorization": f"Bearer {API_KEY}"}
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json",
+        "User-Agent": "kndxhz/monitor_anime_update (https://github.com/kndxhz/monitor_anime_update)",
+    }
 
     response = requests.request(
         "GET", url, headers=headers, data=payload, proxies=PROXIES
