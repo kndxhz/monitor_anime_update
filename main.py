@@ -1,4 +1,4 @@
-# /usr/bin/env python3
+# //sr/bin/env p,thon3,""
 
 import datetime
 import logging
@@ -6,6 +6,7 @@ import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import formataddr
 
 import requests
 from dotenv import load_dotenv
@@ -36,7 +37,11 @@ SMTP_USE_SSL = os.getenv("SMTP_USE_SSL", "true").lower() == "true"
 SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 EMAIL_FROM = os.getenv("EMAIL_FROM", "")
-EMAIL_TO = os.getenv("EMAIL_TO", "").split(",")
+EMAIL_TO = [
+    address.strip()
+    for address in os.getenv("EMAIL_TO", "").split(",")
+    if address.strip()
+]
 
 
 class Base(DeclarativeBase):
@@ -70,6 +75,8 @@ def main():
             )
             session.commit()
             logger.info(f"已从数据库移除过期条目: {orphan_ids}")
+            for subject_id in orphan_ids:
+                notify_monitor_change(subject_id, "删除")
 
         for id in IDS:
             episodes = get_episodes(id)
@@ -111,6 +118,7 @@ def main():
                     )
                 )
                 session.commit()
+                notify_monitor_change(id, "新增")
 
             # now_date = "2026-08-06"
             for episode in episodes["data"]:
@@ -153,38 +161,21 @@ def get_subject(subject_id):
     return response.json()
 
 
-def notify_user(subject_id, episode, now_date):
+def get_subject_name(subject_id):
     subject = get_subject(subject_id)
-    subject_name = subject.get("name_cn") or subject.get("name") or f"番剧 {subject_id}"
-    episode_sort = episode["sort"]
+    return subject.get("name_cn") or subject.get("name") or f"番剧 {subject_id}"
 
-    logger.info(f"{subject_name} 第 {episode_sort} 集今日播出！")
 
+def send_notification(email_subject, text_body, html_body):
     if not all([SMTP_SERVER, SMTP_USER, SMTP_PASSWORD, EMAIL_FROM, EMAIL_TO]):
         logger.warning("SMTP 未配置，跳过通知")
         return
 
-    email_subject = f"[番剧更新] {subject_name} 第 {episode_sort} 集今日播出！"
-    html_body = f"""\
-<html>
-  <body style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-    <h2 style="color: #e74c3c;">番剧更新提醒</h2>
-    <p style="font-size: 16px;"><strong>{subject_name}</strong> 第 <strong>{episode_sort}</strong> 集今日（{now_date}）播出！</p>
-    <a href="https://bgm.tv/subject/{subject_id}" style="display: inline-block; margin-top: 16px; padding: 10px 24px; background: #e74c3c; color: #fff; text-decoration: none; border-radius: 4px;">前往查看</a>
-  </body>
-</html>"""
-
     msg = MIMEMultipart("alternative")
     msg["Subject"] = email_subject
-    msg["From"] = EMAIL_FROM
+    msg["From"] = formataddr(("番剧更新检测", EMAIL_FROM))
     msg["To"] = ", ".join(EMAIL_TO)
-    msg.attach(
-        MIMEText(
-            f"{subject_name} 第 {episode_sort} 集今日（{now_date}）播出！\nhttps://bgm.tv/subject/{subject_id}",
-            "plain",
-            "utf-8",
-        )
-    )
+    msg.attach(MIMEText(text_body, "plain", "utf-8"))
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
     try:
@@ -199,6 +190,52 @@ def notify_user(subject_id, episode, now_date):
         logger.info(f"通知已发送至 {EMAIL_TO}")
     except (smtplib.SMTPException, OSError) as e:
         logger.error(f"发送通知失败: {e}")
+
+
+def notify_monitor_change(subject_id, action):
+    subject_name = get_subject_name(subject_id)
+    action_text = f"已{action}检测项目"
+    subject_url = f"https://bgm.tv/subject/{subject_id}"
+
+    logger.info(f"{action_text}: {subject_name}（ID: {subject_id}）")
+
+    email_subject = f"[番剧检测] {action_text}：{subject_name}"
+    html_body = f"""\
+<html>
+  <body style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+    <h2 style="color: #e74c3c;">番剧检测提醒</h2>
+    <p style="font-size: 16px;">{action_text}：<strong>{subject_name}</strong>（ID: {subject_id}）</p>
+    <a href="{subject_url}" style="display: inline-block; margin-top: 16px; padding: 10px 24px; background: #e74c3c; color: #fff; text-decoration: none; border-radius: 4px;">前往查看</a>
+  </body>
+</html>"""
+    send_notification(
+        email_subject,
+        f"{action_text}：{subject_name}（ID: {subject_id}）\n{subject_url}",
+        html_body,
+    )
+
+
+def notify_user(subject_id, episode, now_date):
+    subject_name = get_subject_name(subject_id)
+    episode_sort = episode["sort"]
+
+    logger.info(f"{subject_name} 第 {episode_sort} 集今日播出！")
+
+    email_subject = f"[番剧更新] {subject_name} 第 {episode_sort} 集今日播出！"
+    html_body = f"""\
+<html>
+  <body style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+    <h2 style="color: #e74c3c;">番剧更新提醒</h2>
+    <p style="font-size: 16px;"><strong>{subject_name}</strong> 第 <strong>{episode_sort}</strong> 集今日（{now_date}）播出！</p>
+    <a href="https://bgm.tv/subject/{subject_id}" style="display: inline-block; margin-top: 16px; padding: 10px 24px; background: #e74c3c; color: #fff; text-decoration: none; border-radius: 4px;">前往查看</a>
+  </body>
+</html>"""
+
+    send_notification(
+        email_subject,
+        f"{subject_name} 第 {episode_sort} 集今日（{now_date}）播出！\nhttps://bgm.tv/subject/{subject_id}",
+        html_body,
+    )
 
 
 if __name__ == "__main__":
