@@ -1,9 +1,10 @@
-# //sr/bin/env p,thon3,""
+# //sr/bin/env python3,""
 
 import datetime
 import logging
 import os
 import smtplib
+import time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr
@@ -151,18 +152,46 @@ def get_episodes(subject_id, type=None, limit=None, offset=None):
     return response.json()
 
 
-def get_subject(subject_id):
+def get_subject(subject_id, max_attempts=10, delay=5):
+
     url = f"https://api.bgm.tv/v0/subjects/{subject_id}"
     headers = {
         "Authorization": f"Bearer {API_KEY}",
         "User-Agent": "kndxhz/monitor_anime_update (https://github.com/kndxhz/monitor_anime_update)",
     }
-    response = requests.get(url, headers=headers, proxies=PROXIES)
-    return response.json()
+    for attempt in range(1, max_attempts + 1):
+        try:
+            response = requests.get(url, headers=headers, proxies=PROXIES)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            if attempt == max_attempts:
+                logger.error(f"获取番剧信息失败，已尝试 {max_attempts} 次: {e}")
+                email_subject = f"[番剧检测异常] 获取番剧信息失败（ID: {subject_id}）"
+                text_body = (
+                    f"获取番剧信息失败，已尝试 {max_attempts} 次。\n"
+                    f"番剧 ID: {subject_id}\n"
+                    f"错误信息: {e}"
+                )
+                html_body = f"""\
+<html>
+  <body style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+    <h2 style="color: #e74c3c;">番剧检测异常</h2>
+    <p style="font-size: 16px;">获取番剧信息失败，已尝试 {max_attempts} 次。</p>
+    <p style="font-size: 16px;">番剧 ID: <strong>{subject_id}</strong></p>
+    <p style="font-size: 16px;">错误信息：{e}</p>
+  </body>
+</html>"""
+                send_notification(email_subject, text_body, html_body)
+                raise SystemExit(1)
+        logger.warning(f"请求失败（第 {attempt} 次），{delay} 秒后重试...")
+        time.sleep(delay)
 
 
 def get_subject_name(subject_id):
     subject = get_subject(subject_id)
+    if subject is None:
+        raise RuntimeError(f"获取不到番剧信息（ID: {subject_id}）")
     return subject.get("name_cn") or subject.get("name") or f"番剧 {subject_id}"
 
 
