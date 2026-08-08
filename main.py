@@ -54,10 +54,13 @@ class EpisodeUpdateInfo(Base):
 
     subject_id: Mapped[int] = mapped_column(primary_key=True)
     now_episode: Mapped[int | None]
-    next_update_time: Mapped[str | None]
+    now_air_time: Mapped[str | None]
+    next_episode: Mapped[int | None]
+    next_air_time: Mapped[str | None]
 
 
 def init_db():
+    # Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
 
 
@@ -107,18 +110,27 @@ def main():
 
             update_info = session.get(EpisodeUpdateInfo, int(id))
             if update_info is None:
-                session.add(
-                    EpisodeUpdateInfo(
-                        subject_id=int(id),
-                        now_episode=(
-                            int(current_episode["sort"]) if current_episode else None
-                        ),
-                        next_update_time=(
-                            next_episode["airdate"] if next_episode else None
-                        ),
-                    )
-                )
-                session.commit()
+                update_info = EpisodeUpdateInfo(subject_id=int(id))
+                session.add(update_info)
+                is_new = True
+            else:
+                is_new = False
+
+            update_info.now_episode = (
+                int(current_episode["sort"]) if current_episode else None
+            )
+            update_info.now_air_time = (
+                current_episode["airdate"] if current_episode else None
+            )
+            update_info.next_episode = (
+                int(next_episode["sort"]) if next_episode else None
+            )
+            update_info.next_air_time = (
+                next_episode["airdate"] if next_episode else None
+            )
+            session.commit()
+
+            if is_new:
                 notify_monitor_change(id, "新增")
 
             # now_date = "2026-08-06"
@@ -177,8 +189,7 @@ def get_episodes(
                 raise SystemExit(1)
         logger.warning(f"请求失败（第 {attempt} 次），{delay} 秒后重试...")
         time.sleep(delay)
-
-    return response.json()
+    raise SystemExit(1)
 
 
 def get_subject(subject_id, max_attempts=10, delay=5):
