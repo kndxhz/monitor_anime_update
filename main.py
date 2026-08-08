@@ -129,7 +129,9 @@ def main():
                     break
 
 
-def get_episodes(subject_id, type=None, limit=None, offset=None):
+def get_episodes(
+    subject_id, type=None, limit=None, offset=None, max_attempts=10, delay=5
+):
     url = f"https://api.bgm.tv/v0/episodes?subject_id={subject_id}"
     if type:
         url += f"&type={type}"
@@ -145,9 +147,36 @@ def get_episodes(subject_id, type=None, limit=None, offset=None):
         "User-Agent": "kndxhz/monitor_anime_update (https://github.com/kndxhz/monitor_anime_update)",
     }
 
-    response = requests.request(
-        "GET", url, headers=headers, data=payload, proxies=PROXIES
-    )
+    # response = requests.request(
+    #     "GET", url, headers=headers, data=payload, proxies=PROXIES
+    # )
+    for attempt in range(1, max_attempts + 1):
+        try:
+            response = requests.get(url, headers=headers, proxies=PROXIES)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            if attempt == max_attempts:
+                logger.error(f"获取番剧信息失败，已尝试 {max_attempts} 次: {e}")
+                email_subject = f"[番剧检测异常] 获取番剧信息失败（ID: {subject_id}）"
+                text_body = (
+                    f"获取番剧信息失败，已尝试 {max_attempts} 次。\n"
+                    f"番剧 ID: {subject_id}\n"
+                    f"错误信息: {e}"
+                )
+                html_body = f"""\
+<html>
+  <body style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+    <h2 style="color: #e74c3c;">番剧检测异常</h2>
+    <p style="font-size: 16px;">获取番剧信息失败，已尝试 {max_attempts} 次。</p>
+    <p style="font-size: 16px;">番剧 ID: <strong>{subject_id}</strong></p>
+    <p style="font-size: 16px;">错误信息：{e}</p>
+  </body>
+</html>"""
+                send_notification(email_subject, text_body, html_body)
+                raise SystemExit(1)
+        logger.warning(f"请求失败（第 {attempt} 次），{delay} 秒后重试...")
+        time.sleep(delay)
 
     return response.json()
 
