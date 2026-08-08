@@ -170,7 +170,7 @@ def get_episodes(
     <h2 style="color: #e74c3c;">番剧检测异常</h2>
     <p style="font-size: 16px;">获取番剧信息失败，已尝试 {max_attempts} 次。</p>
     <p style="font-size: 16px;">番剧 ID: <strong>{subject_id}</strong></p>
-    <p style="font-size: 16px;">错误信息：{e}</p>
+    <p style="font-size: 16px;">错误信息：<code>{e}</code></p>
   </body>
 </html>"""
                 send_notification(email_subject, text_body, html_body)
@@ -208,7 +208,7 @@ def get_subject(subject_id, max_attempts=10, delay=5):
     <h2 style="color: #e74c3c;">番剧检测异常</h2>
     <p style="font-size: 16px;">获取番剧信息失败，已尝试 {max_attempts} 次。</p>
     <p style="font-size: 16px;">番剧 ID: <strong>{subject_id}</strong></p>
-    <p style="font-size: 16px;">错误信息：{e}</p>
+    <p style="font-size: 16px;">错误信息：<code>{e}</code></p>
   </body>
 </html>"""
                 send_notification(email_subject, text_body, html_body)
